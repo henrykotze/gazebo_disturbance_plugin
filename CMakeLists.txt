@@ -36,5 +36,5 @@ add_library("hello_world" src/simple_world_plugin.cpp)
 target_link_libraries("hello_world" ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
 
 
-add_library("generate_disturbance" src/generate_random_disturbances.cpp)
+add_library("generate_disturbance" SHARED src/generate_random_disturbances.cpp)
 target_link_libraries("generate_disturbance" ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
