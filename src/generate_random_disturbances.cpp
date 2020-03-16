@@ -27,12 +27,6 @@ namespace gazebo
     public: void Load(physics::ModelPtr _parent, sdf::ElementPtr /*_sdf*/)
     {
 
-      // if (!ros::isInitialized())
-      // {
-      //   int argc = 0;
-      //   char** argv = NULL;
-      //   ros::init(argc, argv, "gazebo", ros::init_options::AnonymousName);
-      // }
 
       if (!ros::isInitialized())
       {
