@@ -1,14 +1,23 @@
 #include <functional>
+
 #include <gazebo/gazebo.hh>
 #include <gazebo/physics/physics.hh>
 #include <gazebo/common/common.hh>
+#include <gazebo/msgs/msgs.hh>
+#include <gazebo/util/system.hh>
+#include <gazebo/transport/transport.hh>
+
 #include <ignition/math/Vector3.hh>
+
 #include <geometry_msgs/PoseStamped.h>
+
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/ExtendedState.h>
+
 #include <ros/ros.h>
+
 #include <sensor_msgs/TimeReference.h>
 
 namespace gazebo
@@ -18,13 +27,12 @@ namespace gazebo
     public: void Load(physics::ModelPtr _parent, sdf::ElementPtr /*_sdf*/)
     {
 
-      if (!ros::isInitialized())
-      {
-        int argc = 0;
-        char** argv = NULL;
-        ros::init(argc, argv, "gazebo_ros", ros::init_options::NoSigintHandler |
-                                        ros::init_options::AnonymousName);
-      }
+      // if (!ros::isInitialized())
+      // {
+      //   int argc = 0;
+      //   char** argv = NULL;
+      //   ros::init(argc, argv, "gazebo", ros::init_options::AnonymousName);
+      // }
 
       if (!ros::isInitialized())
       {
@@ -33,11 +41,9 @@ namespace gazebo
         return;
       }
 
-      ROS_INFO("LOADED");
-
 
       // ros NodeHandle
-      ros::NodeHandle nh;
+      // ros::NodeHandle nh;
 
       // Store the pointer to the model
       this->model = _parent;
@@ -46,27 +52,33 @@ namespace gazebo
 
 
       // explanation: https://answers.ros.org/question/108551/using-subscribercallback-function-inside-of-a-class-c/
-      subscriber = nh.subscribe<mavros_msgs::ExtendedState>("mavros/ExtendedStates", 10, boost::bind(&DisturbedModel::state_cb,this,_1));
+      // subscriber = nh.subscribe<mavros_msgs::ExtendedState>("mavros/ExtendedStates", 10, boost::bind(&DisturbedModel::state_cb,this,_1));
 
 
       // Listen to the update event. This event is broadcast every
       // simulation iteration.
       this->updateConnection = event::Events::ConnectWorldUpdateBegin(
           std::bind(&DisturbedModel::OnUpdate, this));
+
+      gzmsg << "[Gazebo Disturbance Plugin] Loaded" << "\n";
+      ROS_INFO("Gazebo Disturbance Plugin LOADED");
+
     }
+
+
 
     // Called by the world update start event
     public: void OnUpdate()
     {
       // check callbacks
-      ros::spinOnce();
+      // ros::spinOnce();
 
       // if the drone is in the air
       if(drone_state.landed_state == 2){
         ROS_INFO("DRONE IS IN AIR");
         // drone_model->AddRelativeForce(force_disturbances[0]);
         // drone_model->AddRelativeTorque(torque_disturbances[0]);
-        drone_model->AddRelativeForce(ignition::math::Vector3d(0,0,-2));
+        // drone_model->AddRelativeForce(ignition::math::Vector3d(0,0,2));
       }
 
       // Apply a small linear velocity to the model.

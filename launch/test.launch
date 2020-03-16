@@ -1,0 +1,7 @@
+<launch>
+  <!-- We resume the logic in empty_world.launch, changing only the name of the world to be launched -->
+  <include file="$(find gazebo_ros)/launch/test_empty_world.launch">
+  </include>
+
+
+</launch>
