@@ -20,14 +20,15 @@
 
 #include <sensor_msgs/TimeReference.h>
 
+
+#include <sdf/sdf.hh>
+
 namespace gazebo
 {
   class DisturbedModel : public ModelPlugin
   {
-    public: void Load(physics::ModelPtr _parent, sdf::ElementPtr /*_sdf*/)
+    public: void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
     {
-
-
       if (!ros::isInitialized())
       {
         ROS_FATAL_STREAM("A ROS node for Gazebo has not been initialized, unable to load plugin. "
@@ -36,17 +37,55 @@ namespace gazebo
       }
 
 
+      if (_sdf->HasElement("max_xy_force")){
+
+        max_xy_force = _sdf->GetElement("max_xy_force")->Get<double>();
+      }
+      else{
+        // gzerr << "[gazebo_disturbance_plugin] please specify max_xy_force\n";
+        ROS_FATAL_STREAM("[gazebo_disturbance_plugin] please specify max_xy_force\n");
+
+      }
+
+      if (_sdf->HasElement("max_z_force")){
+        max_z_force = _sdf->GetElement("max_z_force")->Get<double>();
+      }
+      else{
+        gzerr << "[gazebo_disturbance_plugin] please specify max_z_force \n";
+
+      }
+
+      if (_sdf->HasElement("max_z_moment")){
+        max_z_moment = _sdf->GetElement("max_z_moment")->Get<double>();
+      }
+      else{
+        gzerr << "[gazebo_disturbance_plugin] please specify max_z_moment\n";
+
+      }
+
+      if (_sdf->HasElement("max_xy_moment")){
+        max_xy_moment = _sdf->GetElement("max_xy_moment")->Get<double>();
+      }
+      else{
+        gzerr << "[gazebo_disturbance_plugin] please specify max_xy_moment\n";
+
+      }
+
+
       // ros NodeHandle
-      // ros::NodeHandle nh;
+      ros::NodeHandle nh;
 
       // Store the pointer to the model
       this->model = _parent;
+      // this->world = this->model->GetWorld();
+
 
       drone_model = model->GetChildLink("base_link");
 
 
       // explanation: https://answers.ros.org/question/108551/using-subscribercallback-function-inside-of-a-class-c/
-      // subscriber = nh.subscribe<mavros_msgs::ExtendedState>("mavros/ExtendedStates", 10, boost::bind(&DisturbedModel::state_cb,this,_1));
+      subscriber = nh.subscribe<mavros_msgs::ExtendedState>("mavros/extended_state", 10, boost::bind(&DisturbedModel::flight_state_cb,this,_1));
+      subscriber = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, boost::bind(&DisturbedModel::drone_state_cb,this,_1));
 
 
       // Listen to the update event. This event is broadcast every
@@ -54,7 +93,7 @@ namespace gazebo
       this->updateConnection = event::Events::ConnectWorldUpdateBegin(
           std::bind(&DisturbedModel::OnUpdate, this));
 
-      gzmsg << "[Gazebo Disturbance Plugin] Loaded" << "\n";
+     // gzmsg << "[Gazebo Disturbance Plugin] Loaded" << "\n";
       ROS_INFO("Gazebo Disturbance Plugin LOADED");
 
     }
@@ -65,15 +104,19 @@ namespace gazebo
     public: void OnUpdate()
     {
       // check callbacks
-      // ros::spinOnce();
+       ros::spinOnce();
 
-      // if the drone is in the air
-      if(drone_state.landed_state == 2){
-        ROS_INFO("DRONE IS IN AIR");
+
+      // ROS_INFO("Drone local position is: %f, %f, %f",drone_state.pose.position.x,drone_state.pose.position.y,drone_state.pose.position.z);
+
+      // if the drone is in the AIR or LANDING, do disturbance when drone > 0.1m from ground
+      if( (flight_state.landed_state == 2 || flight_state.landed_state == 4 ) && drone_state.pose.position.z > 0.1){
+        ROS_INFO("DRONE IS IN AIR & activating disturbances");
         // drone_model->AddRelativeForce(force_disturbances[0]);
         // drone_model->AddRelativeTorque(torque_disturbances[0]);
         // drone_model->AddRelativeForce(ignition::math::Vector3d(0,0,2));
       }
+
 
       // Apply a small linear velocity to the model.
       //this->model->SetLinearVel(ignition::math::Vector3d(.3, 0, 0));
@@ -86,7 +129,14 @@ namespace gazebo
     }
 
     // callback to retrieve state
-    public: void state_cb(const mavros_msgs::ExtendedState::ConstPtr& msg)
+    public: void flight_state_cb(const mavros_msgs::ExtendedState::ConstPtr& msg)
+    {
+      flight_state = *msg;
+    }
+
+
+    // callback to retrieve state
+    public: void drone_state_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
     {
       drone_state = *msg;
     }
@@ -98,8 +148,11 @@ namespace gazebo
     // Pointer to the update event connection
     private: event::ConnectionPtr updateConnection;
 
+    // flying state of drone
+    private: mavros_msgs::ExtendedState flight_state;
+
     // state of drone
-    private: mavros_msgs::ExtendedState drone_state;
+    private: geometry_msgs::PoseStamped drone_state;
 
     // force disturbances effecting the drone
     private: std::vector<ignition::math::Vector3d> force_disturbances;
@@ -117,6 +170,11 @@ namespace gazebo
 
     // ros subscriber
     private: ros::Subscriber subscriber;
+
+    private: double max_xy_force = 0;
+    private: double max_z_force = 0;
+    private: double max_z_moment = 0;
+    private: double max_xy_moment = 0;
 
 
 
