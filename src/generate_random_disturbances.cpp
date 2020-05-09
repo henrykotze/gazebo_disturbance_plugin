@@ -28,10 +28,14 @@
 
 #include <math.h>       /* exp */
 
+#include <ctime>
+
 std::vector<double> generateRandomPulseTrain(int lenght_of_signal, double minInput, double maxInput);
 std::vector<double> generateRandomRampTrains(int lenght_of_signal, double minInput, double maxInput);
 std::vector<double> generateRandomExpoTrains(int lenght_of_signal, double minInput, double maxInput);
 std::vector<double> generateRandomSquareTrains(int lenght_of_signal, double minInput, double maxInput);
+
+void saveDisturbance2CSV(std::vector<ignition::math::Vector3d> force_disturb,std::vector<ignition::math::Vector3d> moment_disturb, double startTime, std::string file_path);
 
 namespace gazebo
 {
@@ -121,6 +125,11 @@ namespace gazebo
      // gzmsg << "[Gazebo Disturbance Plugin] Loaded" << "\n";
       ROS_INFO("Gazebo Disturbance Plugin LOADED");
 
+      // check callbacks
+       // ros::spinOnce();
+
+
+
 
     }
 
@@ -132,8 +141,32 @@ namespace gazebo
       // check callbacks
        ros::spinOnce();
 
-       // ROS_INFO("Flight Status. mode: %d, armed: %d", flight_state.landed_state, flight_status.connected);
-       ROS_INFO_ONCE("px4 time reference: %lf", (double)(px4_time.time_ref.now().toSec()));
+       // log file starts when drone is armed. get time-date for correct log file
+       if(flight_status.armed == 0){
+         // time used on PX4 is UTC. We are 2 hours ahead so we need to substract 60*60*2 seconds
+
+         std::time_t px4_log_time = std::time(nullptr);
+         // ROS_INFO_STREAM_ONCE("time: " << common::Time().GetWallTime().sec - 7200);
+         ROS_INFO_STREAM_ONCE("time: " << std::put_time(std::gmtime(&px4_log_time), "%y-%m-%e/%H_%M_%S"));
+       }
+
+
+       if(flight_status.mode == "OFFBOARD"){
+         // time used on PX4 is UTC. We are 2 hours ahead so we need to substract 60*60*2 seconds
+
+         std::time_t px4_offboard_time = std::time(nullptr);
+         // ROS_INFO_STREAM_ONCE("time: " << common::Time().GetWallTime().sec - 7200);
+         ROS_INFO_STREAM_ONCE("time when OFFBOARD activated: " << std::put_time(std::gmtime(&px4_offboard_time), "%y-%m-%e/%H_%M_%S"));
+       }
+
+
+
+
+       // ROS_INFO("armed status: %d ", flight_status.armed);
+       //
+       //
+       // // ROS_INFO("Flight Status. mode: %d, armed: %d", flight_state.landed_state, flight_status.connected);
+       // ROS_INFO_ONCE("px4 time reference: %lf", (double)(px4_time.time_ref.now().toSec()));
 
        // ROS_INFO("rs::Time::now: %d", ros::Time::now().toNSec());
       // ROS_INFO("Drone local position is: %f, %f, %f",drone_state.pose.position.x,drone_state.pose.position.y,drone_state.pose.position.z);
@@ -141,12 +174,17 @@ namespace gazebo
       // if the drone is in the AIR or LANDING, do disturbance when drone > 0.1m from ground
       if( (flight_state.landed_state == 2 || flight_state.landed_state == 4 ) && drone_state.pose.position.z > 0.1){
 
+        start_time_disturbance = (double)(px4_time.time_ref.now().toSec());
         ROS_INFO_ONCE("Drone is in air & activating disturbances");
 
         drone_model->AddRelativeForce(force_disturbances[0]);
         drone_model->AddRelativeTorque(torque_disturbances[0]);
-        
+
       }
+
+      // if drone starts to execute trajectory: start with disturbances and get time
+
+
     }
 
 
@@ -215,6 +253,7 @@ namespace gazebo
     private: double max_z_force = 0;
     private: double max_z_moment = 0;
     private: double max_xy_moment = 0;
+    private: double start_time_disturbance = 0;
     private: int disturbance_time;
 
     // force disturbances effecting the drone
@@ -244,6 +283,29 @@ namespace gazebo
 
   // Register this plugin with the simulator
   GZ_REGISTER_MODEL_PLUGIN(DisturbedModel)
+}
+
+
+void saveDisturbance2CSV(std::vector<ignition::math::Vector3d> force_disturb,std::vector<ignition::math::Vector3d> moment_disturb, double startTime, std::string file_path){
+
+    std::ofstream csvFile(file_path);
+
+    // create column names for csv file
+    csvFile << "time,fx,fy,fz,mx,my,mz\n";
+
+    for(int i = 0; i < force_disturb.size(); i++)
+    {
+        //still to do: Add time vector
+        csvFile << ",";
+        csvFile << force_disturb.at(i).X() << "," << force_disturb.at(i).Y() << "," << force_disturb.at(i).Z();
+        csvFile << ",";
+        csvFile << moment_disturb.at(i).X() << "," << moment_disturb.at(i).Y() << moment_disturb.at(i).Z();
+        csvFile << "\n";
+    }
+
+    // Close the file
+    csvFile.close();
+
 }
 
 
