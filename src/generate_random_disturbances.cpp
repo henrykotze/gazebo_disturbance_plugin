@@ -35,7 +35,19 @@ std::vector<double> generateRandomRampTrains(int lenght_of_signal, double minInp
 std::vector<double> generateRandomExpoTrains(int lenght_of_signal, double minInput, double maxInput);
 std::vector<double> generateRandomSquareTrains(int lenght_of_signal, double minInput, double maxInput);
 
-void saveDisturbance2CSV(std::vector<ignition::math::Vector3d> force_disturb,std::vector<ignition::math::Vector3d> moment_disturb, double startTime, std::string file_path);
+
+template <typename T>
+std::vector<T> linspace(T a, T b, size_t N) {
+    T h = (b - a) / static_cast<T>(N-1);
+    std::vector<T> xs(N);
+    typename std::vector<T>::iterator x;
+    T val;
+    for (x = xs.begin(), val = a; x != xs.end(); ++x, val += h)
+        *x = val;
+    return xs;
+}
+
+void saveDisturbance2CSV(std::vector<double> timestamps,std::vector<ignition::math::Vector3d> force_disturb,std::vector<ignition::math::Vector3d> moment_disturb,std::string file_path);
 
 namespace gazebo
 {
@@ -87,7 +99,8 @@ namespace gazebo
       }
 
       if (_sdf->HasElement("disturbance_time")){
-        disturbance_time = (_sdf->GetElement("disturbance_time")->Get<int>())*1000;
+        disturbance_time = (_sdf->GetElement("disturbance_time")->Get<int>());
+        disturbance_time = 100*250;
       }
       else{
         disturbance_time = 0;
@@ -109,12 +122,18 @@ namespace gazebo
       // explanation: https://answers.ros.org/question/108551/using-subscribercallback-function-inside-of-a-class-c/
       sub1 = nh.subscribe<mavros_msgs::ExtendedState>("mavros/extended_state", 10, boost::bind(&DisturbedModel::flight_state_cb,this,_1));
       sub2 = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 10, boost::bind(&DisturbedModel::drone_state_cb,this,_1));
-      sub3 = nh.subscribe<sensor_msgs::TimeReference>("mavros/time_reference", 10, boost::bind(&DisturbedModel::time_cb,this,_1));
-      sub4 = nh.subscribe<mavros_msgs::State>("mavros/state", 10, boost::bind(&DisturbedModel::flight_status_cb,this,_1));
+      sub3 = nh.subscribe<sensor_msgs::TimeReference>("mavros/time_reference", 100, boost::bind(&DisturbedModel::time_cb,this,_1));
+      sub4 = nh.subscribe<mavros_msgs::State>("mavros/state", 1, boost::bind(&DisturbedModel::flight_status_cb,this,_1));
 
 
       // generate the random disturbance sequence to influence the system
       generate_disturbances_sequence();
+
+
+     // ROS_INFO_STREAM_ONCE("log_file: " << std::put_time(std::gmtime(&logging_time), "%Y-%m-%e/%H_%M_%S"));
+
+      // save disturbance
+      saveDisturbance2CSV(timestamps,force_disturbances,torque_disturbances,"/home/henry/test.csv");
 
 
       // Listen to the update event. This event is broadcast every
@@ -124,11 +143,6 @@ namespace gazebo
 
      // gzmsg << "[Gazebo Disturbance Plugin] Loaded" << "\n";
       ROS_INFO("Gazebo Disturbance Plugin LOADED");
-
-      // check callbacks
-       // ros::spinOnce();
-
-
 
 
     }
@@ -141,30 +155,27 @@ namespace gazebo
       // check callbacks
        ros::spinOnce();
 
-       // log file starts when drone is armed. get time-date for correct log file
-       if(flight_status.armed == 0){
-         // time used on PX4 is UTC. We are 2 hours ahead so we need to substract 60*60*2 seconds
 
-         std::time_t px4_log_time = std::time(nullptr);
-         // ROS_INFO_STREAM_ONCE("time: " << common::Time().GetWallTime().sec - 7200);
-         ROS_INFO_STREAM_ONCE("time: " << std::put_time(std::gmtime(&px4_log_time), "%y-%m-%e/%H_%M_%S"));
+       if(disturbance_active == 0){
+         if(ros::Time::now().sec >= 20){
+           disturbance_active = 1;
+         }
        }
 
+      if(disturbance_active == 1){
+        ROS_INFO_ONCE("DISTURBANCE ACTIVATED");
 
-       if(flight_status.mode == "OFFBOARD"){
-         // time used on PX4 is UTC. We are 2 hours ahead so we need to substract 60*60*2 seconds
+        // if( (flight_state.landed_state == 2 || flight_state.landed_state == 4 ) && drone_state.pose.position.z > 0.1){
 
-         std::time_t px4_offboard_time = std::time(nullptr);
-         // ROS_INFO_STREAM_ONCE("time: " << common::Time().GetWallTime().sec - 7200);
-         ROS_INFO_STREAM_ONCE("time when OFFBOARD activated: " << std::put_time(std::gmtime(&px4_offboard_time), "%y-%m-%e/%H_%M_%S"));
+            drone_model->AddRelativeForce(force_disturbances[counter]);
+            drone_model->AddRelativeTorque(torque_disturbances[counter]);
+
+        // }
+        counter++;
+
+
        }
 
-
-
-
-       // ROS_INFO("armed status: %d ", flight_status.armed);
-       //
-       //
        // // ROS_INFO("Flight Status. mode: %d, armed: %d", flight_state.landed_state, flight_status.connected);
        // ROS_INFO_ONCE("px4 time reference: %lf", (double)(px4_time.time_ref.now().toSec()));
 
@@ -172,15 +183,15 @@ namespace gazebo
       // ROS_INFO("Drone local position is: %f, %f, %f",drone_state.pose.position.x,drone_state.pose.position.y,drone_state.pose.position.z);
 
       // if the drone is in the AIR or LANDING, do disturbance when drone > 0.1m from ground
-      if( (flight_state.landed_state == 2 || flight_state.landed_state == 4 ) && drone_state.pose.position.z > 0.1){
-
-        start_time_disturbance = (double)(px4_time.time_ref.now().toSec());
-        ROS_INFO_ONCE("Drone is in air & activating disturbances");
-
-        drone_model->AddRelativeForce(force_disturbances[0]);
-        drone_model->AddRelativeTorque(torque_disturbances[0]);
-
-      }
+      // if( (flight_state.landed_state == 2 || flight_state.landed_state == 4 ) && drone_state.pose.position.z > 0.1){
+      //
+      //   start_time_disturbance = (double)(px4_time.time_ref.now().toSec());
+      //   ROS_INFO_ONCE("Drone is in air & activating disturbances");
+      //
+      //   // drone_model->AddRelativeForce(force_disturbances[0]);
+      //   // drone_model->AddRelativeTorque(torque_disturbances[0]);
+      //
+      // }
 
       // if drone starts to execute trajectory: start with disturbances and get time
 
@@ -194,9 +205,20 @@ namespace gazebo
       std::vector<double> fy = generateRandomPulseTrain(disturbance_time, -max_xy_force, max_xy_force);
       std::vector<double> fz = generateRandomPulseTrain(disturbance_time, -max_z_force, max_z_force);
 
+      // std::vector<double> fx = generateRandomPulseTrain(disturbance_time, 0,0);
+      // std::vector<double> fy = generateRandomPulseTrain(disturbance_time, 0,0);
+      // std::vector<double> fz = generateRandomPulseTrain(disturbance_time, 0,0);
+
+
+
       std::vector<double> mx = generateRandomPulseTrain(disturbance_time, -max_xy_moment, max_xy_moment);
       std::vector<double> my = generateRandomPulseTrain(disturbance_time, -max_xy_moment, max_xy_moment);
       std::vector<double> mz = generateRandomPulseTrain(disturbance_time, -max_z_moment, max_z_moment);
+
+
+      // std::vector<double> mx = generateRandomPulseTrain(disturbance_time, 0,0);
+      // std::vector<double> my = generateRandomPulseTrain(disturbance_time, 0,0);
+      // std::vector<double> mz = generateRandomPulseTrain(disturbance_time, 0,0);
 
       for(int x = 0; x < disturbance_time; x++){
 
@@ -204,6 +226,9 @@ namespace gazebo
         torque_disturbances.push_back(ignition::math::Vector3d(mx[x],my[x],mz[x]));
 
       }
+
+      timestamps = linspace(20.0,120.0,(size_t)25000);
+
 
     }
 
@@ -233,8 +258,11 @@ namespace gazebo
     }
 
 
+
     // Pointer to the model
     private: physics::ModelPtr model;
+
+    private: int disturbance_active = 0;
 
     // Pointer to the update event connection
     private: event::ConnectionPtr updateConnection;
@@ -255,12 +283,16 @@ namespace gazebo
     private: double max_xy_moment = 0;
     private: double start_time_disturbance = 0;
     private: int disturbance_time;
+    private: long unsigned int counter = 0;
 
     // force disturbances effecting the drone
     private: std::vector<ignition::math::Vector3d> force_disturbances;
 
     // moment disturbances effecting the drone
     private: std::vector<ignition::math::Vector3d> torque_disturbances;
+
+    // timestamps for disturbances
+    private: std::vector<double> timestamps;
 
     // link that will experience the disturbance
     private: physics::LinkPtr drone_model;
@@ -286,7 +318,7 @@ namespace gazebo
 }
 
 
-void saveDisturbance2CSV(std::vector<ignition::math::Vector3d> force_disturb,std::vector<ignition::math::Vector3d> moment_disturb, double startTime, std::string file_path){
+void saveDisturbance2CSV(std::vector<double> timestamps,std::vector<ignition::math::Vector3d> force_disturb,std::vector<ignition::math::Vector3d> moment_disturb,std::string file_path){
 
     std::ofstream csvFile(file_path);
 
@@ -296,10 +328,11 @@ void saveDisturbance2CSV(std::vector<ignition::math::Vector3d> force_disturb,std
     for(int i = 0; i < force_disturb.size(); i++)
     {
         //still to do: Add time vector
+        csvFile << timestamps.at(i);
         csvFile << ",";
         csvFile << force_disturb.at(i).X() << "," << force_disturb.at(i).Y() << "," << force_disturb.at(i).Z();
         csvFile << ",";
-        csvFile << moment_disturb.at(i).X() << "," << moment_disturb.at(i).Y() << moment_disturb.at(i).Z();
+        csvFile << moment_disturb.at(i).X() << "," << moment_disturb.at(i).Y() << "," << moment_disturb.at(i).Z();
         csvFile << "\n";
     }
 
