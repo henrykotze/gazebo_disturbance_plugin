@@ -130,10 +130,11 @@ namespace gazebo
       generate_disturbances_sequence();
 
 
-     // ROS_INFO_STREAM_ONCE("log_file: " << std::put_time(std::gmtime(&logging_time), "%Y-%m-%e/%H_%M_%S"));
-
-      // save disturbance
-      saveDisturbance2CSV(timestamps,force_disturbances,torque_disturbances,"/home/henry/test.csv");
+      std::time_t log_filename = time(nullptr);
+      std::ostringstream name_of_logfile;
+      name_of_logfile << "/home/henry/esl-sun/PX4/build/px4_sitl_default/logs/" << std::put_time(std::gmtime(&log_filename), "%Y-%m-%e/%H_%M_%S_disturbance.csv");
+      logfile_name = name_of_logfile.str();
+      ROS_INFO_STREAM_ONCE("log_file: " << logfile_name);
 
 
       // Listen to the update event. This event is broadcast every
@@ -145,8 +146,12 @@ namespace gazebo
       ROS_INFO("Gazebo Disturbance Plugin LOADED");
 
 
-    }
+      // save disturbance
+      saveDisturbance2CSV(timestamps,force_disturbances,torque_disturbances,logfile_name);
 
+
+
+    }
 
 
     // Called by the world update start event
@@ -176,24 +181,6 @@ namespace gazebo
 
        }
 
-       // // ROS_INFO("Flight Status. mode: %d, armed: %d", flight_state.landed_state, flight_status.connected);
-       // ROS_INFO_ONCE("px4 time reference: %lf", (double)(px4_time.time_ref.now().toSec()));
-
-       // ROS_INFO("rs::Time::now: %d", ros::Time::now().toNSec());
-      // ROS_INFO("Drone local position is: %f, %f, %f",drone_state.pose.position.x,drone_state.pose.position.y,drone_state.pose.position.z);
-
-      // if the drone is in the AIR or LANDING, do disturbance when drone > 0.1m from ground
-      // if( (flight_state.landed_state == 2 || flight_state.landed_state == 4 ) && drone_state.pose.position.z > 0.1){
-      //
-      //   start_time_disturbance = (double)(px4_time.time_ref.now().toSec());
-      //   ROS_INFO_ONCE("Drone is in air & activating disturbances");
-      //
-      //   // drone_model->AddRelativeForce(force_disturbances[0]);
-      //   // drone_model->AddRelativeTorque(torque_disturbances[0]);
-      //
-      // }
-
-      // if drone starts to execute trajectory: start with disturbances and get time
 
 
     }
@@ -284,6 +271,7 @@ namespace gazebo
     private: double start_time_disturbance = 0;
     private: int disturbance_time;
     private: long unsigned int counter = 0;
+    private: std::string logfile_name;
 
     // force disturbances effecting the drone
     private: std::vector<ignition::math::Vector3d> force_disturbances;
