@@ -66,6 +66,7 @@ namespace gazebo
       if (_sdf->HasElement("max_xy_force")){
 
         max_xy_force = _sdf->GetElement("max_xy_force")->Get<double>();
+        ROS_INFO("Max force in XY Direction: %f",max_xy_force);
       }
       else{
         // gzerr << "[gazebo_disturbance_plugin] please specify max_xy_force\n";
@@ -76,6 +77,7 @@ namespace gazebo
 
       if (_sdf->HasElement("max_z_force")){
         max_z_force = _sdf->GetElement("max_z_force")->Get<double>();
+        ROS_INFO("Max force in Z Direction: %f",max_z_force);
       }
       else{
         gzerr << "[gazebo_disturbance_plugin] please specify max_z_force \n";
@@ -84,6 +86,7 @@ namespace gazebo
 
       if (_sdf->HasElement("max_z_moment")){
         max_z_moment = _sdf->GetElement("max_z_moment")->Get<double>();
+        ROS_INFO("Max Torque in Z Direction: %f",max_z_moment);
       }
       else{
         gzerr << "[gazebo_disturbance_plugin] please specify max_z_moment\n";
@@ -92,6 +95,7 @@ namespace gazebo
 
       if (_sdf->HasElement("max_xy_moment")){
         max_xy_moment = _sdf->GetElement("max_xy_moment")->Get<double>();
+        ROS_INFO("Max Torque in XY Direction: %f",max_xy_moment);
       }
       else{
         gzerr << "[gazebo_disturbance_plugin] please specify max_xy_moment\n";
@@ -100,7 +104,7 @@ namespace gazebo
 
       if (_sdf->HasElement("disturbance_time")){
         disturbance_time = (_sdf->GetElement("disturbance_time")->Get<int>());
-        disturbance_time = 100*250;
+        disturbance_time = 30*250;
       }
       else{
         disturbance_time = 0;
@@ -132,7 +136,7 @@ namespace gazebo
 
       std::time_t log_filename = time(nullptr);
       std::ostringstream name_of_logfile;
-      name_of_logfile << "/home/henry/esl-sun/PX4/build/px4_sitl_default/logs/" << std::put_time(std::gmtime(&log_filename), "%Y-%m-%e/%H_%M_%S_disturbance.csv");
+      name_of_logfile << "/home/henry/esl-sun/PX4/build/px4_sitl_default/logs/" << std::put_time(std::gmtime(&log_filename), "%Y-%m-%d/%H_%M_%S.dist");
       logfile_name = name_of_logfile.str();
       ROS_INFO_STREAM_ONCE("log_file: " << logfile_name);
 
@@ -167,7 +171,8 @@ namespace gazebo
          }
        }
 
-      if(disturbance_active == 1){
+      if(disturbance_active == 1 && counter < disturbance_time){
+
         ROS_INFO_ONCE("DISTURBANCE ACTIVATED");
 
         // if( (flight_state.landed_state == 2 || flight_state.landed_state == 4 ) && drone_state.pose.position.z > 0.1){
@@ -178,6 +183,11 @@ namespace gazebo
         // }
         counter++;
 
+
+       }
+       else if(counter == disturbance_time){
+
+        ROS_INFO_ONCE("DISTURBANCE DEACTIVATED");
 
        }
 
@@ -198,14 +208,14 @@ namespace gazebo
 
 
 
-      std::vector<double> mx = generateRandomPulseTrain(disturbance_time, -max_xy_moment, max_xy_moment);
-      std::vector<double> my = generateRandomPulseTrain(disturbance_time, -max_xy_moment, max_xy_moment);
-      std::vector<double> mz = generateRandomPulseTrain(disturbance_time, -max_z_moment, max_z_moment);
+      // std::vector<double> mx = generateRandomPulseTrain(disturbance_time, -max_xy_moment, max_xy_moment);
+      // std::vector<double> my = generateRandomPulseTrain(disturbance_time, -max_xy_moment, max_xy_moment);
+      // std::vector<double> mz = generateRandomPulseTrain(disturbance_time, -max_z_moment, max_z_moment);
 
 
-      // std::vector<double> mx = generateRandomPulseTrain(disturbance_time, 0,0);
-      // std::vector<double> my = generateRandomPulseTrain(disturbance_time, 0,0);
-      // std::vector<double> mz = generateRandomPulseTrain(disturbance_time, 0,0);
+      std::vector<double> mx = generateRandomPulseTrain(disturbance_time, 0,0);
+      std::vector<double> my = generateRandomPulseTrain(disturbance_time, 0,0);
+      std::vector<double> mz = generateRandomPulseTrain(disturbance_time, 0,0);
 
       for(int x = 0; x < disturbance_time; x++){
 
@@ -214,7 +224,7 @@ namespace gazebo
 
       }
 
-      timestamps = linspace(20.0,120.0,(size_t)25000);
+      timestamps = linspace(20.0,50.0,(size_t)disturbance_time);
 
 
     }
@@ -311,7 +321,7 @@ void saveDisturbance2CSV(std::vector<double> timestamps,std::vector<ignition::ma
     std::ofstream csvFile(file_path);
 
     // create column names for csv file
-    csvFile << "time,fx,fy,fz,mx,my,mz\n";
+    csvFile << "timestamp,fx,fy,fz,mx,my,mz\n";
 
     for(int i = 0; i < force_disturb.size(); i++)
     {
