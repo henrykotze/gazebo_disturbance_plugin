@@ -1,0 +1,29 @@
+{
+    "configurations": [
+        {
+            "browse": {
+                "databaseFilename": "",
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "includePath": [
+                "/home/henry/catkin_ws/devel/include/**",
+                "/opt/ros/melodic/include/**",
+                "/home/henry/catkin_ws/src/domain_randomisation/include/**",
+                "/home/henry/catkin_ws/src/gazebo_disturbance_plugin/include/**",
+                "/home/henry/catkin_ws/src/generate_dataset/include/**",
+                "/home/henry/catkin_ws/src/mavros/libmavconn/include/**",
+                "/home/henry/catkin_ws/src/mavros/mavros/include/**",
+                "/home/henry/catkin_ws/src/mavros/mavros_msgs/include/**",
+                "/home/henry/catkin_ws/src/px4_gnc/include/**",
+                "/home/henry/catkin_ws/src/mavros/test_mavros/include/**",
+                "/usr/include/**"
+            ],
+            "name": "ROS",
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++14"
+        }
+    ],
+    "version": 4
+}

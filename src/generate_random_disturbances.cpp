@@ -34,6 +34,8 @@ std::vector<double> generateRandomPulseTrain(int lenght_of_signal, double minInp
 std::vector<double> generateRandomRampTrains(int lenght_of_signal, double minInput, double maxInput);
 std::vector<double> generateRandomExpoTrains(int lenght_of_signal, double minInput, double maxInput);
 std::vector<double> generateRandomSquareTrains(int lenght_of_signal, double minInput, double maxInput);
+std::vector<double> generateSingleStep(int lenght_of_signal, double minInput, double maxInput);
+std::vector<double> generateSinus(int lenght_of_signal, double minInput, double maxInput);
 
 
 template <typename T>
@@ -199,8 +201,8 @@ namespace gazebo
     private: void generate_disturbances_sequence()
     {
       std::vector<double> fx = generateRandomPulseTrain(disturbance_time, -max_xy_force, max_xy_force);
-      std::vector<double> fy = generateRandomPulseTrain(disturbance_time, -max_xy_force, max_xy_force);
-      std::vector<double> fz = generateRandomPulseTrain(disturbance_time, -max_z_force, max_z_force);
+      std::vector<double> fy = generateRandomPulseTrain(disturbance_time, 0, 0);
+      std::vector<double> fz = generateRandomPulseTrain(disturbance_time, 0, 0);
 
       // std::vector<double> fx = generateRandomPulseTrain(disturbance_time, 0,0);
       // std::vector<double> fy = generateRandomPulseTrain(disturbance_time, 0,0);
@@ -528,4 +530,52 @@ std::vector<double> generateRandomSquareTrains(int lenght_of_signal, double minI
   }
 
   return signal;
+}
+
+std::vector<double> generateSinus(int lenght_of_signal, double minInput, double maxInput){
+
+  std::vector<double> signal(lenght_of_signal,0.0);
+  double amp = 2.0f;
+  double val = 0.0f;
+  double freq = 1.0f;
+  double dt = 0.001;
+  int step = 0;
+
+  std::vector<double>::iterator i = signal.begin();
+
+  while(step < lenght_of_signal){
+
+    val  = (double)(amp * sin(2*freq*step*dt));
+    // // std::cout << val << std::endl;
+
+    signal[step] = val;
+
+    // signal.assign(i,i,val);
+
+    step += 1;
+
+  }
+
+  return signal;
+
+}
+
+
+std::vector<double> generateSingleStep(int lenght_of_signal, double minInput, double maxInput){
+
+  std::vector<double> signal(lenght_of_signal,0.0);
+  double magInput = 1;
+  int inputDur = 0;     // time of which there is a step
+  int zeroInputDur = 0; // time of which there is a zero input
+
+  inputDur = (int)(ignition::math::Rand::DblUniform(0,1)*(lenght_of_signal)); // time of magnitudel
+  zeroInputDur = lenght_of_signal - inputDur; // time of magnitude
+
+  std::vector<double>::iterator i = signal.begin();
+
+
+  std::fill(i+zeroInputDur, i + zeroInputDur+ inputDur, magInput);
+
+  return signal;
+
 }
